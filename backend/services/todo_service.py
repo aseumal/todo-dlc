@@ -44,6 +44,12 @@ class TodoService:
         if data.due_date is not None:
             self._validate_due_date(data.due_date)
 
+        # Validate reminder_at format if provided
+        reminder_at_value = None
+        if data.reminder_at is not None:
+            parsed_reminder = self._validate_reminder_at(data.reminder_at)
+            reminder_at_value = parsed_reminder.isoformat()
+
         # Create todo record with defaults
         todo_data = {
             "id": str(uuid.uuid4()),
@@ -52,6 +58,7 @@ class TodoService:
             "description": data.description,
             "priority": data.priority.value if data.priority else Priority.MEDIUM.value,
             "due_date": data.due_date,
+            "reminder_at": reminder_at_value,
             "status": data.status.value if data.status else Status.PENDING.value,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "updated_at": None,
@@ -193,6 +200,14 @@ class TodoService:
             self._validate_due_date(data.due_date)
             updates["due_date"] = data.due_date
 
+        if data.reminder_at is not None:
+            if data.reminder_at == "":
+                # Explicit empty string clears the reminder
+                updates["reminder_at"] = None
+            else:
+                parsed_reminder = self._validate_reminder_at(data.reminder_at)
+                updates["reminder_at"] = parsed_reminder.isoformat()
+
         if data.status is not None:
             updates["status"] = data.status.value
 
@@ -285,4 +300,24 @@ class TodoService:
         except ValueError:
             raise ValidationError(
                 [{"field": "due_date", "message": "Invalid date format. Must be YYYY-MM-DD"}]
+            )
+
+    def _validate_reminder_at(self, reminder_at: str) -> datetime:
+        """Validate that reminder_at is a valid ISO 8601 datetime string.
+
+        Args:
+            reminder_at: The datetime string to validate.
+
+        Returns:
+            The parsed datetime object.
+
+        Raises:
+            ValidationError: If the datetime format is invalid.
+        """
+        try:
+            parsed = datetime.fromisoformat(reminder_at)
+            return parsed
+        except (ValueError, TypeError):
+            raise ValidationError(
+                [{"field": "reminder_at", "message": "Invalid datetime format. Must be ISO 8601 (e.g. 2025-01-15T09:00:00)"}]
             )
